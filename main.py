@@ -14,8 +14,8 @@ def main():
     
     fix_seed(args.random_seed)
     
-    print("OPENAI_API_KEY:")
-    print(os.getenv("OPENAI_API_KEY"))
+    # print("OPENAI_API_KEY:")
+    # print(os.getenv("OPENAI_API_KEY"))
     
     # Initialize decoder class (load model and tokenizer) ...
     decoder = Decoder(args)
@@ -106,8 +106,10 @@ def parse_arguments():
     parser.add_argument("--max_num_worker", type=int, default=3, help="maximum number of workers for dataloader")
     
     parser.add_argument(
-        "--model", type=str, default="gpt3", choices=["gpt3", "gpt3-medium", "gpt3-large", "gpt3-xl"], help="model used for decoding. Note that 'gpt3' are the smallest models."
-    )
+    "--model", type=str, default="gemini",
+    choices=["gpt3", "gpt3-medium", "gpt3-large", "gpt3-xl", "gemini", "gemini-flash", "gemini-2.5-flash"],
+    help="model used for decoding"
+)
     
     parser.add_argument(
         "--method", type=str, default="zero_shot_cot", choices=["zero_shot", "zero_shot_cot", "few_shot", "few_shot_cot"], help="method"

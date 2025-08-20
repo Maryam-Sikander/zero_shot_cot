@@ -4,6 +4,7 @@ from collections import OrderedDict
 import xml.etree.ElementTree as ET
 import openai # For GPT-3 API ...
 import os
+import requests # For Gemini API via Scaledown ...
 import multiprocessing
 import json
 import numpy as np
@@ -51,45 +52,67 @@ def print_now(return_flag=0):
         pass
 
 # Sentence Generator (Decoder) for GPT-3 ...
-def decoder_for_gpt3(args, input, max_length, i, k):
-    
-    # GPT-3 API allows each users execute the API within 60 times in a minute ...
-    # time.sleep(1)
+# Sentence Generator (Decoder) for Gemini via Scaledown
+def decoder_for_gemini(args, prompt, max_length, i, k):
+    # Respect API rate limit spacing used elsewhere
     time.sleep(args.api_time_interval)
-    
-    # https://beta.openai.com/account/api-keys
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-    #print(openai.api_key)
-    
-    # Specify engine ...
-    # Instruct GPT3
-    if args.model == "gpt3":
-        engine = "text-ada-001"
-    elif args.model == "gpt3-medium":
-        engine = "text-babbage-001"
-    elif args.model == "gpt3-large":
-        engine = "text-curie-001"
-    elif args.model == "gpt3-xl":
-        engine = "text-davinci-002"
-    else:
-        raise ValueError("model is not properly defined ...")
-        
-    response = openai.Completion.create(
-      engine=engine,
-      prompt=input,
-      max_tokens=max_length,
-      temperature=0,
-      stop=None
-    )
-    
-    return response["choices"][0]["text"]
+
+    # Read API config from env (recommended) or fall back to args if you add them
+    SCALEDOWN_URL = os.getenv("SCALEDOWN_URL", "https://api.scaledown.xyz/compress/")
+    SCALEDOWN_API_KEY = os.getenv("SCALEDOWN_API_KEY")
+    if not SCALEDOWN_API_KEY:
+        raise RuntimeError("Missing SCALEDOWN_API_KEY env var.")
+
+    # Payload aligned to your boilerplate
+    payload = {
+        "context": "",
+        "prompt": prompt,
+        "model": "gemini-2.5-flash",
+        # Keep this deterministic (paper used greedy). If your endpoint supports temperature,
+        # set it to 0. Scaledown 'rate':0 is kept as you provided.
+        "scaledown": {"rate": 0}
+    }
+
+    headers = {
+        "x-api-key": SCALEDOWN_API_KEY,
+        "Content-Type": "application/json"
+    }
+
+    resp = requests.post(SCALEDOWN_URL, headers=headers, data=json.dumps(payload), timeout=60)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Scaledown error {resp.status_code}: {resp.text}")
+
+    # Robust extraction (schema-agnostic)
+    try:
+        data = resp.json()
+    except Exception:
+        return resp.text
+
+    # Common fields to try
+    if isinstance(data, dict):
+        if "text" in data and isinstance(data["text"], str):
+            return data["text"]
+        if "output" in data and isinstance(data["output"], str):
+            return data["output"]
+        if "choices" in data and isinstance(data["choices"], list) and data["choices"]:
+            ch0 = data["choices"][0]
+            # Support both completion and chat-style shapes
+            if isinstance(ch0, dict):
+                if "text" in ch0:
+                    return ch0["text"]
+                if "message" in ch0 and isinstance(ch0["message"], dict) and "content" in ch0["message"]:
+                    return ch0["message"]["content"]
+
+    # Fallback: stringify
+    # return json.dumps(data)
+
 
 class Decoder():
     def __init__(self, args):
         print_now()
  
     def decode(self, args, input, max_length, i, k):
-        response = decoder_for_gpt3(args, input, max_length, i, k)
+        response = decoder_for_gemini(args, input, max_length, i, k)
         return response
 
 def data_reader(args):
