@@ -1,4 +1,3 @@
-# gemini_client.py
 from typing import Optional
 from google import genai
 import os, time
@@ -17,8 +16,7 @@ class GeminiClient:
                 sleep_time = 4 - elapsed
                 print(f"Rate limiting: waiting {sleep_time:.1f}s")
                 time.sleep(sleep_time)
-            self.last_request_time = time.time()  # mark before request
-
+            self.last_request_time = time.time() 
         try:
             if stream:
                 result_text = ""
@@ -27,9 +25,9 @@ class GeminiClient:
                     contents=[{"role": "user", "parts": [{"text": prompt}]}],
                 ):
                     if chunk.text:
-                        print(chunk.text, end="", flush=True)  # live stream
+                        print(chunk.text, end="", flush=True) 
                         result_text += chunk.text
-                print()  # newline after streaming
+                print()  
                 return result_text
             else:
                 response = self.client.models.generate_content(
@@ -37,7 +35,7 @@ class GeminiClient:
                     contents=[{"role": "user", "parts": [{"text": prompt}]}],
                 )
                 text = getattr(response, "text", "").strip()
-                print("Model output:", text)   # <--- print full output
+                print("Model output:", text)  
                 return text
         except Exception as e:
             print("Error from Gemini:", e)
